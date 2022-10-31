@@ -1,23 +1,20 @@
 package model;
 
-import jakarta.persistence.*;
+import javax.persistence.*;
 
 @Entity
-@Table(name = "search_engine", indexes = @Index(columnList = "path"))
+@Table(name = "search_engine")
 public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "Id")
     private int id;
-
     @Column(name = "Path", length = 50, nullable = false)
     private String path;
     @Column(name = "Code", nullable = false)
     private int code;
     @Column(name = "Content", columnDefinition = "mediumtext", nullable = false)
     private String content;
-
-
 
 
     public int getId() {

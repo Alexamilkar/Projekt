@@ -11,8 +11,11 @@ import webSite.SiteConnect;
 import java.io.IOException;
 
 public class ResultBase {
+    public void addResult(String url) throws IOException {
+        addNewPage(url);
+    }
 
-    public void addResult(String stringUrl) throws IOException {
+    public void addNewPage(String stringUrl) throws IOException {
         StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
                 .configure("hibernate.cfg.xml").build();
         Metadata metadata = new MetadataSources(registry).getMetadataBuilder().build();

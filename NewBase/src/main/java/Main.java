@@ -15,7 +15,7 @@ public class Main {
 //        System.out.println(" = " + siteConnect.getStringList());
 
         ResultBase resultBase = new ResultBase();
-        resultBase.addResult(stringUrl);
+        //resultBase.addResult(stringUrl);
 
         System.out.println("Timer - " + (System.currentTimeMillis() - timeStart) + " ms.");
     }
