@@ -1,21 +1,19 @@
-package model;
+package Alex.AmilkarSearchBot.model;
 
 import javax.persistence.*;
 
 @Entity
-@Table(name = "search_engine")
-public class Index {
+@Table(name = "page_index")
+public class SearchIndex {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
     private int id;
-    @Column(name = "Page_Id", nullable = false)
+    @Column(nullable = false)
     private int pageId;
-    @Column(name = "Lemma_Id", nullable = false)
+    @Column(nullable = false)
     private int lemmaId;
-    @Column(name = "Rank", nullable = false)
-    private float rank;
-
+    @Column(nullable = false)
+    private float pageRank;
 
     public int getId() {
         return id;
@@ -41,11 +39,11 @@ public class Index {
         this.lemmaId = lemmaId;
     }
 
-    public float getRank() {
-        return rank;
+    public float getPageRank() {
+        return pageRank;
     }
 
-    public void setRank(float rank) {
-        this.rank = rank;
+    public void setPageRank(float pageRank) {
+        this.pageRank = pageRank;
     }
 }

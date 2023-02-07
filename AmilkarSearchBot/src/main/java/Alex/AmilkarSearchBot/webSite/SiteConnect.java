@@ -1,0 +1,68 @@
+package Alex.AmilkarSearchBot.webSite;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.*;
+
+
+public class SiteConnect {
+    private List<String> stringList = new ArrayList<>();
+    private final List<String> resultListPath = new ArrayList<>();
+    private final List<Integer> resultListCode = new ArrayList<>();
+    private final List<String> resultListContent = new ArrayList<>();
+
+
+    public void webConnect(String stringUrl) throws IOException {
+        Document document = Jsoup.connect(stringUrl).get();
+        Elements links = document.select("a[href]");
+
+        for (Element link : links) {
+            String string = link.attr("abs:href");
+
+            if (!string.isEmpty() && string.startsWith(stringUrl) && !string.contains("#")) {
+                stringList.add(string);
+                Set<String> stringSet = new LinkedHashSet<>(stringList);
+                stringList.clear();
+                stringList.addAll(stringSet);
+            }
+        }
+
+
+        for (String site : getStringList())
+        {
+            String[] split = site.split("/");
+            String siteName = '/' + split[split.length-1];
+            resultListPath.add(siteName);
+
+            URL url = new URL(site);
+            HttpURLConnection http = (HttpURLConnection) url.openConnection();
+            int responseCode = http.getResponseCode();
+            resultListCode.add(responseCode);
+
+            Document doc = Jsoup.connect(site).get();
+            String siteText = doc.text();
+            resultListContent.add(siteText);
+        }
+    }
+
+
+    public List<String> getStringList() {
+        return stringList;
+    }
+
+    public List<String> getResultListPath() {
+        return resultListPath;
+    }
+    public List<Integer> getResultListCode() {
+        return resultListCode;
+    }
+    public List<String> getResultListContent() {
+        return resultListContent;
+    }
+}
