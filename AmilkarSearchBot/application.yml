@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false
+    username: root
+    password: alexamilkar1531
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+#      validate
+#      update
+
+sites:
+  - url: https://www.lenta.ru
+    name: Лента.ру

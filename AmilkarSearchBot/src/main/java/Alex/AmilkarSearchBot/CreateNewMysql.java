@@ -1,21 +1,19 @@
 package Alex.AmilkarSearchBot;
 
+import Alex.AmilkarSearchBot.createBaseMysql.CreateNewField;
+import Alex.AmilkarSearchBot.createBaseMysql.CreateNewLemma;
+import Alex.AmilkarSearchBot.createBaseMysql.CreateNewPage;
+import Alex.AmilkarSearchBot.createBaseMysql.CreateNewSearchIndex;
 import Alex.AmilkarSearchBot.model.*;
-import Alex.AmilkarSearchBot.webConnect.ContentForkJoin;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
 
 @Component
 public class CreateNewMysql implements CommandLineRunner {
@@ -23,274 +21,133 @@ public class CreateNewMysql implements CommandLineRunner {
     private static final String stringUrl2 = "https://volochek.life/";
     private static final String stringUrl3 = "https://nikoartgallery.com/";
     private static final String stringUrl4 = "https://et-cetera.ru/mobile/";
-    private Status status1 = Status.INDEXING; //ИНДЕКСАЦИЯ
-    private Status status2 = Status.INDEXED; //ИНДЕКСИРОВАНО
-    private Status status3 = Status.FAILED; //НЕ УДАЛОСЬ
 
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    PageCrudRepository pageCrudRepository;
-    LemmaCrudRepository lemmaCrudRepository;
-    FieldCrudRepository fieldCrudRepository;
-    SearchIndexCrudRepository searchIndexCrudRepository;
-    SiteCrudRepository siteCrudRepository;
+    private String searchString = "телефон белый в метро";
+
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+
+    private PageCrudRepository pageCrudRepository;
+    private LemmaCrudRepository lemmaCrudRepository;
+    private FieldCrudRepository fieldCrudRepository;
+    private SearchIndexCrudRepository searchIndexCrudRepository;
+    private SiteCrudRepository siteCrudRepository;
+    private final AmilkarCrudRepository amilkarCrudRepository;
 
     @Autowired
     public CreateNewMysql(PageCrudRepository pageCrudRepository,
                           LemmaCrudRepository lemmaCrudRepository,
                           FieldCrudRepository fieldCrudRepository,
                           SearchIndexCrudRepository searchIndexCrudRepository,
-                          SiteCrudRepository siteCrudRepository) {
+                          SiteCrudRepository siteCrudRepository,
+                          AmilkarCrudRepository amilkarCrudRepository) {
         this.pageCrudRepository = pageCrudRepository;
         this.lemmaCrudRepository = lemmaCrudRepository;
         this.fieldCrudRepository = fieldCrudRepository;
         this.searchIndexCrudRepository = searchIndexCrudRepository;
         this.siteCrudRepository = siteCrudRepository;
+        this.amilkarCrudRepository = amilkarCrudRepository;
     }
 
     @Override
-    public void run(String... args) throws Exception {
-        List<String> siteList = new ArrayList<>();
-
-        siteList.add(stringUrl1);
-        siteList.add(stringUrl2);
-        siteList.add(stringUrl3);
-        siteList.add(stringUrl4);
-
-        createNewBase(siteList);
+    public void run(String... args) throws IOException, InterruptedException {
+//        siteIndexing(stringUrl1);
+//        searchString(searchString);
     }
 
-    public void createNewBase(List<String> list) throws IOException {
 
-        createNewSite(list);
-        createNewField();
 
-        ArrayList siteList = new ArrayList<>((Collection) siteCrudRepository.findAll());
+    public void searchString(String searchString) throws IOException {
+        List<String> lemmaList = new ArrayList<>((Collection) lemmaCrudRepository.findAll());
+        List<String> indexList = new ArrayList<>((Collection) searchIndexCrudRepository.findAll());
+        List<String> pageList = new ArrayList<>((Collection) pageCrudRepository.findAll());
 
-        for (int s = 0; s < siteList.size(); s++)
-        {
-            String siteUrl = siteCrudRepository.findById(s + 1).get().getUrl();
-            int siteId = siteCrudRepository.findById(s + 1).get().getId();
+        Set<String> stringSet = LemmaFinder.getInstance().getLemmaSet(searchString);
 
-            ArrayList<Thread> threads = new ArrayList<>();
+        String lemma = "";
+        int lemmaId = 0;
+        int idPage = 0;
+        float pageRank = 0;
+        String page = "";
 
-            threads.add(new Thread(() -> {
-                synchronized (siteUrl) {
-                    try {
-                        createNewPage(siteUrl, siteId);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }}));
+        for (String string : stringSet) {
 
-            threads.add(new Thread(() -> {
-                synchronized (siteUrl) {
-                    try {
-                        createNewLemma(siteUrl, siteId);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }}));
-            threads.forEach(Thread::start);
+            for (int i = 0; i < lemmaList.size(); i++) {
+                lemma = lemmaCrudRepository.findById(i + 1).get().getLemma();
+                if (stringSet.contains(lemma)) {
+                    lemmaId = lemmaCrudRepository.findById(i + 1).get().getId();
+                }
+            }
+            for (int j = 0; j < indexList.size(); j++) {
+                int idLemma = searchIndexCrudRepository.findById(j + 1).get().getLemmaId();
+                if (indexList.contains(idLemma)) {
+                    idPage = searchIndexCrudRepository.findById(j + 1).get().getPageId();
+                    pageRank = searchIndexCrudRepository.findById(j + 1).get().getPageRank();
+                }
+            }
+
+            for (int p = 0; p < pageList.size(); p++) {
+                int id = pageCrudRepository.findById(p + 1).get().getId();
+                if (pageList.contains(id)) {
+                    page = pageCrudRepository.findById(p + 1).get().getPath();
+                }
+            }
+
+            Amilkar amilkar = new Amilkar();
+            amilkar.setLemma(lemma);
+            amilkar.setIdLemma(lemmaId);
+            amilkar.setRank(pageRank);
+            amilkar.setPage(page);
+
+            amilkarCrudRepository.save(amilkar);
         }
-        //createNewSearchIndex();
     }
 
-    public void createNewSite(List<String> stringList) throws IOException
-    {
-        for (String stringUrl : stringList) {
-            Document document = Jsoup.connect(stringUrl).get();
+    public void siteIndexing(String stringUrl) throws IOException, InterruptedException {
+        Document document = Jsoup.connect(stringUrl).userAgent("AmilkarSearchBot").get();
 
-            String siteUrl = document.location();
-            String siteName = document.title();
+        String siteUrl = document.location();
+        String siteName = document.title();
 
-            Site site = new Site();
+        Site site = new Site();
 
-            site.setStatus(status1);
+        site.setStatus(Status.INDEXING);
+        site.setStatusTime(dateFormat.format(new Date()));
+        site.setUrl(siteUrl);
+        site.setName(siteName);
+        siteCrudRepository.save(site);
+
+        Thread threadField = new Thread(new CreateNewField(fieldCrudRepository));
+        threadField.start();
+
+        Thread threadPage = new Thread(new CreateNewPage(site.getUrl(), site.getId(), pageCrudRepository));
+        threadPage.start();
+
+        Thread threadLemma = new Thread(new CreateNewLemma(site.getUrl(), site.getId(), lemmaCrudRepository));
+        threadLemma.start();
+
+        threadPage.join();
+        threadLemma.join();
+
+        Thread threadSearchIndex = new Thread(new CreateNewSearchIndex(fieldCrudRepository,
+                pageCrudRepository, lemmaCrudRepository, searchIndexCrudRepository));
+        threadSearchIndex.start();
+        threadSearchIndex.join();
+
+        if (threadSearchIndex.getState().toString().equals("TERMINATED")) {
+            site.setStatus(Status.INDEXED);
             site.setStatusTime(dateFormat.format(new Date()));
             site.setUrl(siteUrl);
             site.setName(siteName);
-
             siteCrudRepository.save(site);
         }
-    }
 
-    public void createNewField() {
-        Field field1 = new Field();
-
-        field1.setName("title");
-        field1.setSelector("title");
-        field1.setWeight(1);
-
-        fieldCrudRepository.save(field1);
-
-        Field field2 = new Field();
-
-        field2.setName("body");
-        field2.setSelector("body");
-        field2.setWeight(0.8F);
-
-        fieldCrudRepository.save(field2);
-    }
-
-    public void createNewPage(String siteUrl, int siteId) throws IOException {
-
-//            String siteUrl = siteCrudRepository.findById(s+1).get().getUrl();
-//            int siteId = siteCrudRepository.findById(s+1).get().getId();
-
-        List<String> strings = new ArrayList<>();
-
-        Document document = Jsoup.connect(siteUrl).get();
-        Elements links = document.select("a[href]");
-
-        for (Element link : links) {
-            String string = link.attr("abs:href");
-
-            if (!string.isEmpty() && string.startsWith(siteUrl) && !string.contains("#")) {
-                strings.add(string);
-                Set<String> stringSet = new LinkedHashSet<>(strings);
-                strings.clear();
-                strings.addAll(stringSet);
-            }
-        }
-
-        for (int i = 0; i < strings.size(); i++)
-        {
-            String site = strings.get(i);
-
-            String[] split = site.split("/");
-            String siteName = '/' + split[split.length-1];
-
-            URL url = new URL(site);
-            HttpURLConnection http = (HttpURLConnection) url.openConnection();
-            int responseCode = http.getResponseCode();
-
-            String siteContent = new ForkJoinPool().invoke(new ContentForkJoin(site));
-
-            if (siteContent != null) {
-                Page page = new Page();
-
-                page.setPath(siteName);
-                page.setCode(responseCode);
-                page.setContent(siteContent);
-                page.setSiteId(siteId);
-
-                pageCrudRepository.save(page);
-            }
-        }
-
-    }
-
-    public void createNewLemma(String siteUrl, int siteId) throws IOException {
-        ArrayList siteList = new ArrayList<>((Collection) siteCrudRepository.findAll());
-
-
-//            String siteUrl = siteCrudRepository.findById(s+1).get().getUrl();
-//            int siteId = siteCrudRepository.findById(s+1).get().getId();
-
-            List<String> strings = new ArrayList<>();
-
-            Document document = Jsoup.connect(siteUrl).get();
-            Elements links = document.select("a[href]");
-
-            for (Element link : links) {
-                String string = link.attr("abs:href");
-
-                if (!string.isEmpty() && string.startsWith(siteUrl) && !string.contains("#")) {
-                    strings.add(string);
-                    Set<String> stringSet = new LinkedHashSet<>(strings);
-                    strings.clear();
-                    strings.addAll(stringSet);
-                }
-            }
-
-            Map<String, Integer> mapLemma = new HashMap<>();
-
-            for (int i = 0; i < strings.size(); i++) {
-
-                String site = strings.get(i);
-                String text = new ForkJoinPool().invoke(new ContentForkJoin(site));
-
-                if (text != null) {
-                    Set<String> stringSet = LemmaFinder.getInstance().getLemmaSet(text);
-                    for (String lemma : stringSet) {
-                        if (mapLemma.containsKey(lemma)) {
-                            mapLemma.replace(lemma, mapLemma.get(lemma), mapLemma.get(lemma) + 1);
-                        } else mapLemma.put(lemma, 1);
-                    }
-                }
-            }
-
-            List<String> lemmaList = new ArrayList<>(mapLemma.keySet());
-            List<Integer> lemmaIntList = new ArrayList<>(mapLemma.values());
-
-            for (int i = 0; i < lemmaList.size(); i++) {
-
-                String lemmaSt = lemmaList.get(i);
-                int limmaInt = lemmaIntList.get(i);
-
-                Lemma lemma = new Lemma();
-
-                lemma.setLemma(lemmaSt);
-                lemma.setFrequency(limmaInt);
-                lemma.setSiteId(siteId);
-
-                lemmaCrudRepository.save(lemma);
-            }
-
-    }
-
-    public void createNewSearchIndex() throws IOException {
-        ArrayList pageList = new ArrayList<>((Collection) pageCrudRepository.findAll());
-
-        ArrayList lemmaListIndex = new ArrayList<>((Collection) lemmaCrudRepository.findAll());
-
-        float titleRank = fieldCrudRepository.findById(1).get().getWeight();
-
-        float bodyRank = fieldCrudRepository.findById(2).get().getWeight();
-
-        for (int j = 0; j < pageList.size(); j++) {
-            int siteId = pageCrudRepository.findById(j + 1).get().getId();
-            String siteContent = pageCrudRepository.findById(j + 1).get().getContent();
-
-            Document doc = Jsoup.parse(siteContent);
-
-            String title = doc.select("title").toString();
-            Set<String> lemmaTitle = LemmaFinder.getInstance().getLemmaSet(title);
-            List<String> stringsTitle = new ArrayList<>(lemmaTitle);
-
-            String body = doc.select("body").toString();
-            Map<String, Integer> lemmaMapBody = LemmaFinder.getInstance().collectLemmas(body);
-            List<String> stringsBody = new ArrayList<>(lemmaMapBody.keySet());
-            List<Integer> integersBody = new ArrayList<>(lemmaMapBody.values());
-
-            int wordCount = 0;
-            int indexTitle = 0;
-            float rank = 0;
-            String lemma = "";
-
-            for (int i = 0; i < lemmaListIndex.size(); i++) {
-                int lemmaId = lemmaCrudRepository.findById(i + 1).get().getId();
-                lemma = lemmaCrudRepository.findById(i + 1).get().getLemma();
-
-                if (stringsTitle.contains(lemma) && stringsBody.contains(lemma)) {
-                    indexTitle = (int) titleRank;
-                    int indexBody = stringsBody.indexOf(lemma);
-                    wordCount = integersBody.get(indexBody);
-                } else if (!stringsTitle.contains(lemma) && stringsBody.contains(lemma)) {
-                    indexTitle = 0;
-                    int indexBody = stringsBody.indexOf(lemma);
-                    wordCount = integersBody.get(indexBody);
-                }
-                rank = indexTitle + (wordCount * bodyRank);
-
-                SearchIndex searchIndex = new SearchIndex();
-
-                searchIndex.setLemmaId(lemmaId);
-                searchIndex.setPageId(siteId);
-                searchIndex.setPageRank(rank);
-
-                searchIndexCrudRepository.save(searchIndex);
-            }
+        if (threadSearchIndex.getState().toString().equals("BLOCKED")) {
+            site.setStatus(Status.FAILED);
+            site.setStatusTime(dateFormat.format(new Date()));
+            site.setUrl(siteUrl);
+            site.setName(siteName);
+            siteCrudRepository.save(site);
         }
     }
 }
